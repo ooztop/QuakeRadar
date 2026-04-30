@@ -156,7 +156,13 @@ function handleCommand(cmd) {
         broadcast({ type: 'LOCATION_REQUEST' });
     } else if (cmd === 'reset') {
         alertedUsers.clear();
+        // Tüm kullanıcıları 'SAFE' durumuna döndür
+        users.forEach(user => {
+            user.status = 'SAFE';
+        });
         broadcast({ type: 'RESET' });
+        updateAdminUserList();
+        logToAdmin('🔄 Sistem sıfırlandı. Tüm kullanıcılar güvenli moda çekildi.', 'system');
     }
 }
 

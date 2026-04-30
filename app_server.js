@@ -9,19 +9,17 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 8765;
-const ADMIN_SECRET = 'QUAKE_SECRET_2024'; // Profesyonel panel için gizli anahtar
+const ADMIN_SECRET = 'QUAKE_SECRET_2024';
 
 // Veri yapıları
-const users = new Map(); // ws -> { name, bloodType, hotspotName, ... }
-const allUsersByName = new Map(); // hotspotName -> userData
+const users = new Map(); // ws -> { id, name, bloodType, status, coords, ... }
+const allUsersByName = new Map();
 const alertedUsers = new Set(); 
-const admins = new Set(); // Admin WebSocket bağlantıları
+const admins = new Set(); 
 
-// Express Ayarları
 app.use(express.static('public'));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
-// Yardımcı Fonksiyonlar
 function logToAdmin(text, level = 'info') {
     console.log(`[${level.toUpperCase()}] ${text}`);
     const msg = JSON.stringify({ type: 'LOG', payload: { text, level } });
@@ -31,7 +29,7 @@ function logToAdmin(text, level = 'info') {
 }
 
 function updateAdminUserList() {
-    const userList = Array.from(users.values()).map(u => ({ name: u.name, bloodType: u.bloodType }));
+    const userList = Array.from(users.values());
     const msg = JSON.stringify({ type: 'UPDATE_USERS', payload: userList });
     admins.forEach(admin => {
         if (admin.readyState === WebSocket.OPEN) admin.send(msg);
@@ -41,22 +39,20 @@ function updateAdminUserList() {
 function broadcast(msg) {
     const data = JSON.stringify(msg);
     wss.clients.forEach((client) => {
-        // Adminlere sistem mesajlarını gönderme (onlar LOG üzerinden alıyor)
         if (client.readyState === WebSocket.OPEN && !admins.has(client)) {
             client.send(data);
         }
     });
 }
 
-// WebSocket Mantığı
 wss.on('connection', (ws) => {
-    logToAdmin('Yeni bir bağlantı kuruldu.', 'system');
+    // Benzersiz ID oluştur (bağlantı için)
+    const connectionId = Math.random().toString(36).substr(2, 9);
 
     ws.on('message', (data) => {
         try {
             const msg = JSON.parse(data);
 
-            // --- ADMIN KONTROLLERİ ---
             if (msg.type === 'ADMIN_AUTH') {
                 if (msg.payload.secret === ADMIN_SECRET) {
                     admins.add(ws);
@@ -72,51 +68,49 @@ wss.on('connection', (ws) => {
                 return;
             }
 
-            // --- KULLANICI / ESP32 MANTİĞI ---
             if (msg.type === 'REGISTER') {
-                const userData = msg.payload;
+                const userData = { ...msg.payload, id: connectionId, status: 'SAFE', coords: null };
                 users.set(ws, userData);
                 const searchKey = (userData.hotspotName || userData.name).toLowerCase();
                 allUsersByName.set(searchKey, userData);
                 
-                logToAdmin(`Kayıt Alındı: ${userData.name} (${userData.bloodType})`, 'success');
+                logToAdmin(`Yeni Cihaz: ${userData.name}`, 'success');
                 updateAdminUserList();
             }
 
             if (msg.type === 'STATUS') {
-                const user = users.get(ws) || { name: 'Bilinmeyen' };
-                const isTrapped = msg.payload.status === 'TRAPPED';
-                const statusText = isTrapped ? '🆘 ENKAZDA!' : '✅ GÜVENDE';
-                
-                logToAdmin(`${user.name} durumu: ${statusText}`, isTrapped ? 'alert' : 'success');
-                
-                if (msg.payload.coords) {
-                    logToAdmin(`📍 Konum: ${msg.payload.coords.latitude}, ${msg.payload.coords.longitude}`, 'info');
+                const user = users.get(ws);
+                if (user) {
+                    user.status = msg.payload.status;
+                    user.coords = msg.payload.coords;
+                    
+                    const isTrapped = user.status === 'TRAPPED';
+                    logToAdmin(`${user.name} durumu: ${isTrapped ? '🆘 ENKAZDA!' : '✅ GÜVENDE'}`, isTrapped ? 'alert' : 'success');
+                    updateAdminUserList();
+                }
+            }
+
+            if (msg.type === 'LOCATION_UPDATE') {
+                const user = users.get(ws);
+                if (user && msg.payload) {
+                    user.coords = { latitude: msg.payload.latitude, longitude: msg.payload.longitude };
+                    updateAdminUserList();
                 }
             }
 
             if (msg.type === 'RADAR_SCAN') {
                 const { ssid, rssi } = msg.payload;
                 const ssidLower = ssid.toLowerCase();
-                
                 for (let [key, user] of allUsersByName) {
                     if (ssidLower.includes(key) || key.includes(ssidLower)) {
                         if (!alertedUsers.has(key)) {
-                            logToAdmin(`🚨 RADAR TESPİTİ: ${user.name} bulundu! (SSID: ${ssid}, Güç: ${rssi}dBm)`, 'alert');
-                            broadcast({
-                                type: 'TARGET_FOUND',
-                                payload: { name: user.name, ssid: ssid, rssi: rssi }
-                            });
+                            logToAdmin(`🚨 RADAR TESPİTİ: ${user.name} bulundu!`, 'alert');
+                            broadcast({ type: 'TARGET_FOUND', payload: { name: user.name, ssid: ssid, rssi: rssi } });
                             alertedUsers.add(key);
                         }
                         break;
                     }
                 }
-            }
-
-            if (msg.type === 'LOCATION_UPDATE') {
-                const user = users.get(ws) || { name: 'Bilinmeyen' };
-                logToAdmin(`📡 ${user.name} için anlık konum güncellendi.`, 'info');
             }
 
         } catch (e) {
@@ -127,11 +121,10 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (admins.has(ws)) {
             admins.delete(ws);
-            console.log('Yönetici paneli ayrıldı.');
         } else {
             const user = users.get(ws);
             if (user) {
-                logToAdmin(`${user.name} bağlantısı kesildi.`, 'system');
+                logToAdmin(`${user.name} ayrıldı.`, 'system');
                 users.delete(ws);
                 updateAdminUserList();
             }
@@ -139,13 +132,12 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Komut İşleme Merkezi
 function handleCommand(cmd) {
     if (cmd === 'deprem') {
-        logToAdmin('🚨 DEPREM UYARISI TÜM CİHAZLARA GÖNDERİLİYOR!', 'alert');
+        logToAdmin('🚨 DEPREM UYARISI GÖNDERİLDİ!', 'alert');
         broadcast({ type: 'EARTHQUAKE_ALERT' });
     } else if (cmd === 'konum') {
-        logToAdmin('📍 Tüm kullanıcılardan konum talebi yapılıyor...', 'info');
+        logToAdmin('📍 Konum talebi gönderildi.', 'info');
         broadcast({ type: 'LOCATION_REQUEST' });
     } else if (cmd === 'reset') {
         alertedUsers.clear();
@@ -154,14 +146,6 @@ function handleCommand(cmd) {
     }
 }
 
-// Terminalden de kontrol edilebilsin (Yerel testler için)
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-rl.on('line', (input) => handleCommand(input.trim().toLowerCase()));
-
 server.listen(PORT, () => {
-    console.log('\n🚨 QUAKERADAR PROFESSIONAL SERVER');
-    console.log('=====================================');
-    console.log(`🚀 Sunucu adresi: http://localhost:${PORT}`);
-    console.log(`📱 Admin Paneli: http://localhost:${PORT}`);
-    console.log('=====================================\n');
+    console.log(`🚀 Sunucu aktif: http://localhost:${PORT}`);
 });

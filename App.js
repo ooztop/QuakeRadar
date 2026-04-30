@@ -14,8 +14,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 
-const SERVER_IP = 'Omer-MacBook-Pro-2.local'; // Mac cihazının gerçek adı: Omer-MacBook-Pro-2.local
-const SERVER_PORT = 8765;
+const SERVER_URL = 'quakeradar.onrender.com';
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Ekran sabitleri
@@ -52,7 +52,7 @@ export default function App() {
   // ── WebSocket bağlantısı ────────────────────────────────────────────────────
   useEffect(() => {
     const connect = () => {
-      const ws = new WebSocket(`ws://${SERVER_IP}:${SERVER_PORT}`);
+      const ws = new WebSocket(`wss://${SERVER_URL}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
+    "server": "node app_server.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
@@ -13,6 +14,7 @@
     "expo": "~54.0.0",
     "expo-location": "~19.0.8",
     "expo-status-bar": "~3.0.9",
+    "express": "^5.2.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "serialport": "^13.0.0",

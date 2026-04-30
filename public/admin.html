@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuakeRadar Professional | Admin Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ff3e3e;
+            --secondary: #2d3436;
+            --accent: #00cec9;
+            --bg: #0f0f13;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text: #ffffff;
+            --text-dim: #a0a0a0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(255, 62, 62, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(0, 206, 201, 0.05) 0%, transparent 40%);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            box-shadow: 0 0 20px rgba(255, 62, 62, 0.4);
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .status-badge {
+            background: rgba(0, 255, 127, 0.1);
+            color: #00ff7f;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(0, 255, 127, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff7f;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff7f;
+            animation: pulse 2s infinite;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-dim);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 16px;
+            border-radius: 14px;
+            border: none;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff3e3e, #c0392b);
+            box-shadow: 0 10px 20px rgba(255, 62, 62, 0.2);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #00cec9, #0984e3);
+            box-shadow: 0 10px 20px rgba(0, 206, 201, 0.2);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-dim);
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .terminal {
+            background: #000;
+            border-radius: 16px;
+            padding: 1.5rem;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.1);
+        }
+
+        .log-entry { margin-bottom: 8px; border-left: 2px solid transparent; padding-left: 10px; }
+        .log-info { color: #00cec9; }
+        .log-alert { color: #ff3e3e; font-weight: bold; border-left-color: #ff3e3e; }
+        .log-success { color: #00ff7f; }
+        .log-system { color: #a0a0a0; font-style: italic; }
+
+        .user-list {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        .blood-type {
+            background: rgba(255, 62, 62, 0.2);
+            color: #ff3e3e;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.75rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">Q</div>
+                <h1>QUAKERADAR<span style="color:var(--primary)">PRO</span></h1>
+            </div>
+            <div class="status-badge" id="conn-status">
+                <div class="status-dot"></div>
+                Sunucu Aktif
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="side-panel">
+                <div class="card" style="margin-bottom: 2rem;">
+                    <div class="card-title">🚨 Acil Durum Kontrolü</div>
+                    <div class="controls">
+                        <button class="btn btn-danger" onclick="sendCommand('deprem')">
+                            <span>📡</span> DEPREM UYARISI GÖNDER
+                        </button>
+                        <button class="btn btn-info" onclick="sendCommand('konum')">
+                            <span>📍</span> KONUM TALEBİ YAP
+                        </button>
+                        <button class="btn btn-outline" onclick="sendCommand('reset')">
+                            <span>🔄</span> SİSTEMİ SIFIRLA
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">👥 Bağlı Kullanıcılar (<span id="user-count">0</span>)</div>
+                    <div class="user-list" id="user-list">
+                        <div class="log-system">Henüz kimse bağlı değil...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-panel">
+                <div class="card" style="height: 100%;">
+                    <div class="card-title">🖥️ Canlı Sistem Logları</div>
+                    <div class="terminal" id="terminal">
+                        <div class="log-system">[SİSTEM] QuakeRadar Professional Konsolu Başlatıldı...</div>
+                        <div class="log-system">[SİSTEM] WebSocket bağlantısı bekleniyor...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        const terminal = document.getElementById('terminal');
+        const userList = document.getElementById('user-list');
+        const userCount = document.getElementById('user-count');
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                addLog('Sunucuya bağlanıldı.', 'success');
+                // Admin olarak kendini tanıt
+                ws.send(JSON.stringify({ type: 'ADMIN_AUTH', payload: { secret: 'QUAKE_SECRET_2024' } }));
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                
+                if (msg.type === 'LOG') {
+                    addLog(msg.payload.text, msg.payload.level);
+                }
+                
+                if (msg.type === 'UPDATE_USERS') {
+                    updateUserList(msg.payload);
+                }
+            };
+
+            ws.onclose = () => {
+                addLog('Bağlantı kesildi. Yeniden deneniyor...', 'alert');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function addLog(text, level = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry log-${level}`;
+            const time = new Date().toLocaleTimeString();
+            div.innerHTML = `[${time}] ${text}`;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function updateUserList(users) {
+            userCount.innerText = users.length;
+            userList.innerHTML = '';
+            
+            if (users.length === 0) {
+                userList.innerHTML = '<div class="log-system">Henüz kimse bağlı değil...</div>';
+                return;
+            }
+
+            users.forEach(user => {
+                const item = document.createElement('div');
+                item.className = 'user-item';
+                item.innerHTML = `
+                    <span>${user.name}</span>
+                    <span class="blood-type">${user.bloodType}</span>
+                `;
+                userList.appendChild(item);
+            });
+        }
+
+        function sendCommand(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ADMIN_COMMAND', payload: cmd }));
+                addLog(`Komut gönderildi: ${cmd.toUpperCase()}`, 'system');
+            } else {
+                alert('Sunucu bağlantısı yok!');
+            }
+        }
+
+        connect();
+    </script>
+</body>
+</html>

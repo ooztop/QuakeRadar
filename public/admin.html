@@ -202,9 +202,11 @@
                     if (selectedUserId) {
                         const updatedUser = connectedUsers.find(u => u.id === selectedUserId);
                         if (updatedUser) {
-                            selectUser(updatedUser, false); // false: listeyi tekrar render etme
+                            selectUser(updatedUser, false);
                         }
                     }
+                }
+
                 if (msg.type === 'RADAR_STATUS') {
                     updateRadarUI(msg.payload);
                 }

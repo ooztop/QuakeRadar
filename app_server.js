@@ -12,10 +12,11 @@ const PORT = process.env.PORT || 8765;
 const ADMIN_SECRET = 'QUAKE_SECRET_2024';
 
 // Veri yapıları
-const users = new Map(); // ws -> { id, name, bloodType, status, coords, ... }
+const users = new Map(); 
 const allUsersByName = new Map();
 const alertedUsers = new Set(); 
 const admins = new Set(); 
+let isRadarActive = false; // Radar durum takibi
 
 app.use(express.static('public'));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
@@ -36,6 +37,14 @@ function updateAdminUserList() {
     });
 }
 
+function updateRadarStatus(status) {
+    isRadarActive = status;
+    const msg = JSON.stringify({ type: 'RADAR_STATUS', payload: isRadarActive });
+    admins.forEach(admin => {
+        if (admin.readyState === WebSocket.OPEN) admin.send(msg);
+    });
+}
+
 function broadcast(msg) {
     const data = JSON.stringify(msg);
     wss.clients.forEach((client) => {
@@ -46,8 +55,8 @@ function broadcast(msg) {
 }
 
 wss.on('connection', (ws) => {
-    // Benzersiz ID oluştur (bağlantı için)
     const connectionId = Math.random().toString(36).substr(2, 9);
+    let currentRole = 'CLIENT';
 
     ws.on('message', (data) => {
         try {
@@ -56,9 +65,18 @@ wss.on('connection', (ws) => {
             if (msg.type === 'ADMIN_AUTH') {
                 if (msg.payload.secret === ADMIN_SECRET) {
                     admins.add(ws);
+                    currentRole = 'ADMIN';
                     logToAdmin('Yönetici paneli yetkilendirildi.', 'success');
                     updateAdminUserList();
+                    ws.send(JSON.stringify({ type: 'RADAR_STATUS', payload: isRadarActive }));
                 }
+                return;
+            }
+
+            if (msg.type === 'RADAR_CONNECTED') {
+                currentRole = 'RADAR';
+                updateRadarStatus(true);
+                logToAdmin('🚀 Drone Radar Sistemi Bağlandı!', 'success');
                 return;
             }
 
@@ -73,7 +91,6 @@ wss.on('connection', (ws) => {
                 users.set(ws, userData);
                 const searchKey = (userData.hotspotName || userData.name).toLowerCase();
                 allUsersByName.set(searchKey, userData);
-                
                 logToAdmin(`Yeni Cihaz: ${userData.name}`, 'success');
                 updateAdminUserList();
             }
@@ -83,9 +100,6 @@ wss.on('connection', (ws) => {
                 if (user) {
                     user.status = msg.payload.status;
                     user.coords = msg.payload.coords;
-                    
-                    const isTrapped = user.status === 'TRAPPED';
-                    logToAdmin(`${user.name} durumu: ${isTrapped ? '🆘 ENKAZDA!' : '✅ GÜVENDE'}`, isTrapped ? 'alert' : 'success');
                     updateAdminUserList();
                 }
             }
@@ -119,8 +133,11 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        if (admins.has(ws)) {
+        if (currentRole === 'ADMIN') {
             admins.delete(ws);
+        } else if (currentRole === 'RADAR') {
+            updateRadarStatus(false);
+            logToAdmin('⚠️ Radar Sistemi Bağlantısı Kesildi!', 'alert');
         } else {
             const user = users.get(ws);
             if (user) {
@@ -134,18 +151,15 @@ wss.on('connection', (ws) => {
 
 function handleCommand(cmd) {
     if (cmd === 'deprem') {
-        logToAdmin('🚨 DEPREM UYARISI GÖNDERİLDİ!', 'alert');
         broadcast({ type: 'EARTHQUAKE_ALERT' });
     } else if (cmd === 'konum') {
-        logToAdmin('📍 Konum talebi gönderildi.', 'info');
         broadcast({ type: 'LOCATION_REQUEST' });
     } else if (cmd === 'reset') {
         alertedUsers.clear();
         broadcast({ type: 'RESET' });
-        logToAdmin('🔄 Sistem sıfırlandı.', 'system');
     }
 }
 
 server.listen(PORT, () => {
-    console.log(`🚀 Sunucu aktif: http://localhost:${PORT}`);
+    console.log(`🚀 Sunucu aktif: Port ${PORT}`);
 });

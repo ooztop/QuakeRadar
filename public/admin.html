@@ -120,7 +120,10 @@
         <div class="main-content">
             <header>
                 <h3 id="panel-title">Sistem Konsolu</h3>
-                <div id="conn-status" style="font-size: 0.8rem; color: #00ff7f;">● Sunucu Bağlı</div>
+                <div id="conn-status" style="font-size: 0.8rem; color: #00ff7f; display: flex; align-items: center; gap: 15px;">
+                <span id="radar-status" class="status-pill danger" style="background: rgba(255, 62, 62, 0.1);">📡 Radar: KAPALI</span>
+                ● Sunucu Bağlı
+            </div>
             </header>
             <div class="card" style="overflow: hidden;">
                 <div class="terminal" id="terminal">
@@ -202,8 +205,23 @@
                             selectUser(updatedUser, false); // false: listeyi tekrar render etme
                         }
                     }
+                if (msg.type === 'RADAR_STATUS') {
+                    updateRadarUI(msg.payload);
                 }
             };
+        }
+
+        function updateRadarUI(isActive) {
+            const el = document.getElementById('radar-status');
+            if (isActive) {
+                el.innerText = '📡 Radar: AKTİF';
+                el.className = 'status-pill safe';
+                el.style.background = 'rgba(0, 255, 127, 0.1)';
+            } else {
+                el.innerText = '📡 Radar: KAPALI';
+                el.className = 'status-pill danger';
+                el.style.background = 'rgba(255, 62, 62, 0.1)';
+            }
         }
 
         function renderUserList() {

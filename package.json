@@ -1,5 +1,5 @@
 {
-  "name": "merhabaapp",
+  "name": "quakeradar",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -9,10 +9,14 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~55.0.4",
-    "expo-status-bar": "~55.0.4",
-    "react": "19.2.0",
-    "react-native": "0.83.2"
+    "@serialport/parser-readline": "^13.0.0",
+    "expo": "~54.0.0",
+    "expo-location": "~19.0.8",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "serialport": "^13.0.0",
+    "ws": "^8.19.0"
   },
   "private": true
 }

@@ -1,0 +1,46 @@
+# Deprem Acil Durum Sistemi - Çalıştırma Talimatları
+
+Bu proje; bir mobil uygulama (React Native/Expo), bir ana sunucu (App Server) ve drone üzerindeki ESP cihazıyla haberleşen bir radar sunucusundan (Radar Server) oluşmaktadır.
+
+## 📋 Gereksinimler
+- Bilgisayarınızda **Node.js** kurulu olmalıdır.
+- Drone/Radar kısmını test etmek için **ESP cihazı** USB ile bağlı olmalıdır.
+- Mobil uygulamayı test etmek için telefonunuzda **Expo Go** uygulaması yüklü olmalıdır.
+
+## 🛠️ Kurulum
+1. Proje klasöründe bir terminal açın.
+2. Bağımlılıkları yüklemek için şu komutu çalıştırın:
+   ```bash
+   npm install
+   ```
+
+## 🚀 Çalıştırma Sırası
+
+### 1. Ana Sunucuyu Başlatma (App Server)
+Bu sunucu mobil cihazlar ve radar arasındaki trafiği yönetir.
+```bash
+node app_server.js
+```
+*Komutlar:* `deprem` (uyarı gönder), `konum` (güncel konum iste), `liste` (cihazları gör).
+
+### 2. Radar Sunucusunu Başlatma (Drone/Radar)
+ESP cihazını bilgisayara bağladıktan sonra bu sunucuyu çalıştırın. ESP'den gelen Wi-Fi tarama verilerini ana sunucuya iletir.
+```bash
+node radar_server.js
+```
+*İpucu:* Tarama sonuçlarını anlık görmek için bu terminalde **Enter** tuşuna basabilir veya `log` yazabilirsiniz.
+
+### 3. Mobil Uygulamayı Başlatma (Expo)
+Yeni bir terminal sekmesinde uygulamayı başlatın:
+```bash
+npm start
+```
+Ekranda çıkan **QR kodu** telefonunuzdaki **Expo Go** uygulamasıyla okutun.
+
+## 📡 Çalışma Mantığı
+1. Uygulamada kullanıcı adını ve **Hotspot Adını** (Ağ Adı) girerek kayıt olur.
+2. "Enkazdayım" butonuna basıldığında durum sunucuya bildirilir.
+3. Drone (Radar Server) uçarken çevredeki Wi-Fi ağlarını tarar.
+4. Taranan bir ağ adı, uygulamada kayıtlı bir kullanıcının Hotspot ismiyle eşleşirse ana sunucu **"HEDEF TESPİT EDİLDİ"** uyarısı verir.
+
+İyi çalışmalar!

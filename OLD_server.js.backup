@@ -1,0 +1,276 @@
+const { WebSocketServer } = require('ws');
+const readline = require('readline');
+
+const PORT = 8765;
+// Enkazda olan kullanıcıları takip et
+const trappedUsers = new Set();
+const wss = new WebSocketServer({ port: PORT });
+
+// Bağlı kullanıcıları tut
+const users = new Map(); // ws -> { name, bloodType, hotspotName, ... }
+const allUsersByName = new Map(); // hotspotName -> { name, bloodType, emergencyContacts, ... } (Kalıcı kayıt)
+
+console.log('\n🚨 DEPREM ACİL DURUM SİSTEMİ - SUNUCU');
+console.log('=====================================');
+console.log(`✅ WebSocket sunucu hazır → ws://localhost:${PORT}`);
+console.log('\nKomutlar:');
+console.log('  deprem     → Deprem uyarısı gönder');
+console.log('  konum      → Enkazda olanlardan güncel konum iste');
+console.log('  liste      → Bağlı kullanıcıları listele');
+console.log('  reset      → Sistemi sıfırla (normal moda dön)');
+console.log('=====================================\n');
+
+wss.on('connection', (ws) => {
+    console.log('📱 Yeni cihaz bağlandı.');
+
+    ws.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data);
+
+            // Kullanıcı kayıt bilgisi geldi
+            if (msg.type === 'REGISTER') {
+                const userData = msg.payload;
+                users.set(ws, userData);
+                
+                // Kalıcı kayıda ekle (Hotspot bears search key)
+                const searchKey = (userData.hotspotName || userData.name).toLowerCase();
+                allUsersByName.set(searchKey, userData);
+
+                console.log(`\n👤 Kayıt: ${userData.name} | Kan: ${userData.bloodType}`);
+                console.log(`   📡 Hotspot Adı: ${userData.hotspotName || 'Varsayılan'}`);
+                console.log(`   Acil 1: ${userData.emergency1} | Acil 2: ${userData.emergency2}`);
+                console.log(`   Ev: ${userData.homeLocation}`);
+            }
+
+            // Kullanıcı durumu bildirdi
+            if (msg.type === 'STATUS') {
+                const user = users.get(ws) || {};
+                const statusEmoji = msg.payload.status === 'SAFE' ? '✅' : '🆘';
+                const statusText = msg.payload.status === 'SAFE' ? 'GÜVENDE' : 'ENKAZDA';
+                console.log(`\n${statusEmoji} DURUM | ${user.name || 'Bilinmeyen'} → ${statusText}`);
+                if (msg.payload.coords) {
+                    console.log(`   📍 Konum: ${msg.payload.coords.latitude}, ${msg.payload.coords.longitude}`);
+                }
+                if (msg.payload.status === 'TRAPPED') {
+                    trappedUsers.add(ws);
+                    console.log(`   🚑 KURTARMA EKİBİ GÖNDERİLİYOR!`);
+                    console.log(`   👥 Acil Kişiler: ${user.emergency1}, ${user.emergency2}`);
+                } else {
+                    trappedUsers.delete(ws);
+                }
+            }
+
+            // Güncel konum güncellemesi
+            if (msg.type === 'LOCATION_UPDATE') {
+                const user = users.get(ws) || {};
+                console.log(`\n📡 ANLИК KONUM GELDİ`);
+                console.log('─────────────────────────────────────');
+                console.log(`  👤 ${user.name || 'Bilinmeyen'} | 🩸 ${user.bloodType || '-'}`);
+                if (user.emergency1) console.log(`  📞 Acil 1: ${user.emergency1}`);
+                if (user.emergency2) console.log(`  📞 Acil 2: ${user.emergency2}`);
+                if (user.homeLocation) console.log(`  🏠 Ev: ${user.homeLocation}`);
+                if (msg.payload && msg.payload.latitude) {
+                    console.log(`  📍 Şu anki konum: ${msg.payload.latitude}, ${msg.payload.longitude}`);
+                } else {
+                    console.log('  ⚠️  Konum alınamadı.');
+                }
+                console.log('─────────────────────────────────────');
+            }
+        } catch (e) {
+            console.error('Mesaj parse hatası:', e.message);
+        }
+    });
+
+    ws.on('close', () => {
+        trappedUsers.delete(ws);
+        const user = users.get(ws);
+        console.log(`📱 Bağlantı kesildi${user ? ': ' + user.name : ''}.`);
+        users.delete(ws);
+    });
+});
+
+// Terminal komutları
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+rl.on('line', (input) => {
+    const cmd = input.trim().toLowerCase();
+
+    if (cmd === 'deprem') {
+        const count = wss.clients.size;
+        if (count === 0) {
+            console.log('⚠️  Bağlı cihaz yok.');
+            return;
+        }
+        console.log(`\n🚨 DEPREM UYARISI GÖNDERİLİYOR → ${count} cihaz`);
+        broadcast({ type: 'EARTHQUAKE_ALERT' });
+
+        // Kayıtlı kullanıcıların son bilgilerini listele
+        console.log('\n📋 EN SON KAYITLI KULLANICI BİLGİLERİ:');
+        console.log('─────────────────────────────────────');
+        if (users.size === 0) {
+            console.log('  Kayıtlı kullanıcı yok.');
+        } else {
+            let i = 1;
+            users.forEach((user) => {
+                console.log(`  [${i++}] 👤 ${user.name} | 🩸 ${user.bloodType}`);
+                console.log(`       📞 Acil 1: ${user.emergency1}`);
+                if (user.emergency2) console.log(`       📞 Acil 2: ${user.emergency2}`);
+                console.log(`       🏠 Ev: ${user.homeLocation}`);
+            });
+        }
+        console.log('─────────────────────────────────────');
+
+    } else if (cmd === 'konum') {
+        if (trappedUsers.size === 0) {
+            console.log('⚠️  Enkazda bildiren kullanıcı yok.');
+            return;
+        }
+        console.log(`\n📡 KONUM TALEBİ GÖNDERİLİYOR → ${trappedUsers.size} kişi`);
+        trappedUsers.forEach((client) => {
+            if (client.readyState === 1) {
+                client.send(JSON.stringify({ type: 'LOCATION_REQUEST' }));
+            }
+        });
+
+    } else if (cmd === 'liste') {
+        const count = wss.clients.size;
+        console.log(`\n📋 Bağlı cihaz sayısı: ${count}`);
+        users.forEach((user) => {
+            console.log(`  - ${user.name} | ${user.bloodType}`);
+        });
+
+    } else if (cmd === 'reset') {
+        console.log('\n🔄 Sistem sıfırlanıyor...');
+        broadcast({ type: 'RESET' });
+
+    } else if (cmd) {
+        console.log('❓ Bilinmeyen komut. (deprem / konum / liste / reset)');
+    }
+});
+
+function broadcast(msg) {
+    const data = JSON.stringify(msg);
+    wss.clients.forEach((client) => {
+        if (client.readyState === 1) client.send(data);
+    });
+}
+
+// ==========================================
+// 🔌 ESP32 RADAR / KABLO (SERIAL) ENTEGRASYONU
+// ==========================================
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
+
+let port;
+let parser;
+
+// ESP'nin bağlı olabileceği yaygın portları bulmaya çalışalım
+async function setupSerial() {
+    try {
+        const ports = await SerialPort.list();
+        console.log('\n🔍 Bağlı USB Cihazlar taranıyor...');
+        
+        // ESP32/ESP8266 genellikle usbserial veya usbmodem olarak görünür
+        const espPortInfo = ports.find(p => 
+            p.path.includes('usbserial') || 
+            p.path.includes('usbmodem') || 
+            p.manufacturer?.includes('Silicon Labs') || 
+            p.manufacturer?.includes('WCH')
+        );
+
+        if (espPortInfo) {
+            console.log(`✅ ESP Cihazı Bulundu: ${espPortInfo.path}`);
+            connectToSerial(espPortInfo.path);
+        } else {
+            console.log('⚠️  ESP cihazı otomatik bulunamadı.');
+            console.log('💡 Lütfen kabloyu kontrol edin veya portu manuel girin.');
+            if (ports.length > 0) {
+                console.log('Mevcut Portlar:');
+                ports.forEach(p => console.log(`  - ${p.path} (${p.manufacturer || 'Bilinmiyor'})`));
+            }
+        }
+    } catch (err) {
+        console.error('❌ Port listeleme hatası:', err.message);
+    }
+}
+
+function connectToSerial(path) {
+    port = new SerialPort({
+        path: path,
+        baudRate: 115200,
+        autoOpen: true
+    });
+
+    parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+
+    port.on('open', () => {
+        console.log(`📡 [SERIAL] ${path} bağlantısı açıldı. Veri bekleniyor...`);
+    });
+
+    parser.on('data', (data) => {
+        // ESP tarafında [SCAN] önekiyle gönderdiğimiz veriyi ayıklıyoruz
+        if (data.startsWith('[SCAN]')) {
+            const content = data.replace('[SCAN]', '').trim();
+            const parts = content.split(',');
+            
+            if (parts.length >= 2) {
+                const ssid = parts[0] || '<Gizli Ağ>';
+                const rssi = parseInt(parts[1]);
+
+                console.log(`📡 [SERIAL RADAR] Tarama Sonucu: ${ssid} | Sinyal: ${rssi} dBm`);
+
+                // Eğer sinyal güçlüyse broadcast yapalım
+                if (rssi > -85) {
+                    // RADAR EŞLEŞTİRME MANTIĞI
+                    const ssidLower = ssid.toLowerCase();
+                    let matchedUser = null;
+
+                    // Tüm kayıtlı kullanıcıları tara
+                    for (let [key, user] of allUsersByName) {
+                        if (ssidLower.includes(key) || key.includes(ssidLower)) {
+                            matchedUser = user;
+                            break;
+                        }
+                    }
+
+                    if (matchedUser) {
+                        console.log('\n************************************************');
+                        console.log(`🚨 [RADAR] HEDEF TESPİT EDİLDİ!`);
+                        console.log(`👤 Kişinin Adı: ${matchedUser.name}`);
+                        console.log(`📡 Bulunan SSID: ${ssid} (Güç: ${rssi} dBm)`);
+                        console.log(`📞 Acil İletişim: ${matchedUser.emergency1}`);
+                        console.log('************************************************\n');
+                    }
+
+                    broadcast({
+                        type: 'ESP_RADAR_DATA',
+                        payload: { 
+                            ssid, 
+                            rssi, 
+                            matchedUser: matchedUser ? matchedUser.name : null,
+                            timestamp: new Date().toLocaleTimeString() 
+                        }
+                    });
+                }
+            }
+        } else if (data.startsWith('[DONE]')) {
+            console.log('✅ Tarama turu tamamlandı.');
+        } else {
+            // Diğer debug mesajlarını yazdıralım
+            if (data.trim()) console.log(`ℹ️ [ESP]: ${data}`);
+        }
+    });
+
+    port.on('error', (err) => {
+        console.error('❌ Serial Port Hatası:', err.message);
+        setTimeout(setupSerial, 5000); // Hata durumunda yeniden dene
+    });
+
+    port.on('close', () => {
+        console.log('🔌 Serial bağlantı kapandı.');
+        setTimeout(setupSerial, 5000);
+    });
+}
+
+// Başlat
+setupSerial();

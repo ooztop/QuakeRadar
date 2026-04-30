@@ -194,6 +194,14 @@
                 if (msg.type === 'UPDATE_USERS') {
                     connectedUsers = msg.payload;
                     renderUserList();
+                    
+                    // Seçili kullanıcının verilerini anlık güncelle
+                    if (selectedUserId) {
+                        const updatedUser = connectedUsers.find(u => u.id === selectedUserId);
+                        if (updatedUser) {
+                            selectUser(updatedUser, false); // false: listeyi tekrar render etme
+                        }
+                    }
                 }
             };
         }
@@ -219,9 +227,9 @@
             });
         }
 
-        function selectUser(user) {
+        function selectUser(user, shouldRenderList = true) {
             selectedUserId = user.id;
-            renderUserList();
+            if (shouldRenderList) renderUserList();
             
             document.getElementById('no-selection').style.display = 'none';
             document.getElementById('detail-view').style.display = 'block';

@@ -4,7 +4,7 @@ const { WebSocket } = require('ws');
 const readline = require('readline');
 
 // 🔌 AYARLAR
-const APP_SERVER_URL = 'ws://localhost:8765'; // Ana sunucu adresi
+const APP_SERVER_URL = 'wss://quakeradar.onrender.com'; // Ana sunucu adresi (Render)
 const SERIAL_BAUD = 115200;
 
 let port;
